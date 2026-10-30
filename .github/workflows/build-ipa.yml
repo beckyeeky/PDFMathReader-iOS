@@ -2,6 +2,12 @@ name: Build unsigned IPA
 
 on:
   workflow_dispatch:
+    inputs:
+      configuration:
+        description: Build configuration
+        default: Release
+        type: choice
+        options: [Release, Debug]
 
 permissions:
   contents: write
@@ -10,6 +16,7 @@ jobs:
   build:
     if: github.repository == 'beckyeeky/PDFMathReader-iOS'
     runs-on: macos-26
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -34,12 +41,12 @@ jobs:
           xcodebuild archive \
             -project PDFMathReader.xcodeproj \
             -scheme PDFMathReader \
-            -configuration Release \
+            -configuration ${{ inputs.configuration }} \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/PDFMathReader.xcarchive" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            | tee "$RUNNER_TEMP/build.log" | xcpretty || (tail -200 "$RUNNER_TEMP/build.log"; grep -E "error:" "$RUNNER_TEMP/build.log" | head -50; exit 1)
+            > "$RUNNER_TEMP/build.log" 2>&1 || (tail -200 "$RUNNER_TEMP/build.log"; grep -E "error:" "$RUNNER_TEMP/build.log" | head -50; exit 1)
 
       - name: Package IPA
         run: |
@@ -50,6 +57,13 @@ jobs:
           cd out && zip -qry ../PDFMathReader-unsigned.ipa Payload
           cd .. && ls -lh PDFMathReader-unsigned.ipa
 
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ inputs.configuration }}
+          path: ${{ runner.temp }}/build.log
+
       - uses: actions/upload-artifact@v4
         with:
           name: PDFMathReader-unsigned-ipa
@@ -59,7 +73,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="build-${{ github.run_number }}"
+          TAG="build-${{ github.run_number }}-${{ inputs.configuration }}"
           gh release create "$TAG" PDFMathReader-unsigned.ipa \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Unsigned IPA $TAG" \
