@@ -8,6 +8,10 @@ on:
         default: Release
         type: choice
         options: [Release, Debug]
+      xcode:
+        description: Xcode app version suffix (empty = latest 26.x)
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -16,7 +20,7 @@ jobs:
   build:
     if: github.repository == 'beckyeeky/PDFMathReader-iOS'
     runs-on: macos-26
-    timeout-minutes: 120
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +28,7 @@ jobs:
         run: |
           ls -d /Applications/Xcode*.app
           XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "${{ inputs.xcode }}" ] && XC=/Applications/Xcode_${{ inputs.xcode }}.app
           [ -z "$XC" ] && XC=/Applications/Xcode.app
           echo "Using $XC"
           sudo xcode-select -s "$XC/Contents/Developer"
@@ -38,6 +43,8 @@ jobs:
       - name: Archive (unsigned)
         run: |
           set -o pipefail
+          ( sleep 1500; echo "=== WATCHDOG: still running after 25 min ==="; ps -Ao etime,args | grep -E "swift-frontend|swiftc|ld|actool|ibtool" | grep -v grep | cut -c1-600; tail -40 "$RUNNER_TEMP/build.log"; pkill -f xcodebuild ) &
+          WD=$!
           xcodebuild archive \
             -project PDFMathReader.xcodeproj \
             -scheme PDFMathReader \
@@ -46,16 +53,9 @@ jobs:
             -archivePath "$RUNNER_TEMP/PDFMathReader.xcarchive" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            > "$RUNNER_TEMP/build.log" 2>&1 || (tail -200 "$RUNNER_TEMP/build.log"; grep -E "error:" "$RUNNER_TEMP/build.log" | head -50; exit 1)
-
-      - name: Package IPA
-        run: |
-          APP="$RUNNER_TEMP/PDFMathReader.xcarchive/Products/Applications/PDFMathReader.app"
-          ls "$APP"
-          mkdir -p out/Payload
-          cp -R "$APP" out/Payload/
-          cd out && zip -qry ../PDFMathReader-unsigned.ipa Payload
-          cd .. && ls -lh PDFMathReader-unsigned.ipa
+            > "$RUNNER_TEMP/build.log" 2>&1 || { kill $WD 2>/dev/null; grep -E "error:" "$RUNNER_TEMP/build.log" | sort -u | head -50; tail -60 "$RUNNER_TEMP/build.log"; exit 1; }
+          kill $WD 2>/dev/null || true
+          grep -E "^\*\* ARCHIVE" "$RUNNER_TEMP/build.log"
 
       - name: Upload build log
         if: always()
