@@ -225,26 +225,33 @@ private struct ReaderComparePageSurface: View {
     let pageBounds = page.bounds(for: .cropBox)
     let scale = pageBounds.width > 0 ? width / pageBounds.width : 1
     ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-      let blockWidth = max(1, CGFloat(block.width) * scale)
-      let blockHeight = max(CGFloat(block.height), CGFloat(block.fontSize) * 1.1) * scale
-      Text(block.translation)
-        .font(.system(
-          size: max(6, min(36, CGFloat(block.fontSize) * scale)),
-          weight: block.bold ? .semibold : .regular
-        ))
-        .multilineTextAlignment(textAlignment(block.textAlign))
-        .lineSpacing(1)
-        .lineLimit(nil)
-        .minimumScaleFactor(0.45)
-        .allowsTightening(true)
-        .padding(max(1.5, CGFloat(block.fontSize) * scale * 0.28))
-        .frame(width: blockWidth, height: blockHeight, alignment: .topLeading)
-        .background(Color(uiColor: .systemBackground).opacity(0.98))
-        .position(
-          x: (CGFloat(block.x) + CGFloat(block.width) / 2) * scale,
-          y: (CGFloat(block.y) + max(CGFloat(block.height), CGFloat(block.fontSize) * 1.1) / 2) * scale
-        )
+      paragraphBlock(block, scale: scale)
     }
+  }
+
+  private func paragraphBlock(_ block: ExportParagraphBlock, scale: CGFloat) -> some View {
+    let fontSize: CGFloat = CGFloat(block.fontSize)
+    let rawHeight: CGFloat = max(CGFloat(block.height), fontSize * 1.1)
+    let blockWidth: CGFloat = max(1, CGFloat(block.width) * scale)
+    let blockHeight: CGFloat = rawHeight * scale
+    let textSize: CGFloat = max(6, min(36, fontSize * scale))
+    let padding: CGFloat = max(1.5, fontSize * scale * 0.28)
+    let centerX: CGFloat = (CGFloat(block.x) + CGFloat(block.width) / 2) * scale
+    let centerY: CGFloat = (CGFloat(block.y) + rawHeight / 2) * scale
+    let weight: Font.Weight = block.bold ? .semibold : .regular
+    let font: Font = .system(size: textSize, weight: weight)
+    let background: Color = Color(uiColor: .systemBackground).opacity(0.98)
+    return Text(block.translation)
+      .font(font)
+      .multilineTextAlignment(textAlignment(block.textAlign))
+      .lineSpacing(1)
+      .lineLimit(nil)
+      .minimumScaleFactor(0.45)
+      .allowsTightening(true)
+      .padding(padding)
+      .frame(width: blockWidth, height: blockHeight, alignment: .topLeading)
+      .background(background)
+      .position(x: centerX, y: centerY)
   }
 
   private func pageImage(_ page: PDFPage, size: CGSize) -> some View {
