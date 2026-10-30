@@ -9,8 +9,12 @@ on:
         type: choice
         options: [Release, Debug]
       xcode:
-        description: Xcode app version suffix (empty = latest 26.x)
-        default: ""
+        description: Xcode app version suffix (empty = image default)
+        default: "27.0"
+        type: string
+      runner:
+        description: Runner label
+        default: xcode-27
         type: string
 
 permissions:
@@ -19,7 +23,7 @@ permissions:
 jobs:
   build:
     if: github.repository == 'beckyeeky/PDFMathReader-iOS'
-    runs-on: macos-26
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +47,7 @@ jobs:
       - name: Archive (unsigned)
         run: |
           set -o pipefail
-          ( sleep 600; echo "=== WATCHDOG: still running after 10 min ==="; ps -Ao pid,etime,args | grep swift-frontend | grep -v grep | while read pid et rest; do echo "PID $pid ELAPSED $et"; echo "$rest" | tr ' ' '\n' | grep -A1 -E '^-primary-file$' | grep -v -- '-primary-file' | grep -v -- '--'; done; ps -Ao etime,args | grep -E "SwiftCompile|actool|ibtool|ld " | grep -v grep | cut -c1-300; tail -40 "$RUNNER_TEMP/build.log"; pkill -f xcodebuild ) &
+          ( sleep 600; echo "=== WATCHDOG: still running after 10 min ==="; ps -Ao pid,etime,args | grep swift-frontend | grep -v grep | while read pid et rest; do echo "PID $pid ELAPSED $et"; sample $pid 3 2>/dev/null | grep -E "swift::|llvm::" | head -60; echo "$rest" | tr ' ' '\n' | grep -A1 -E '^-primary-file$' | grep -v -- '-primary-file' | grep -v -- '--'; done; ps -Ao etime,args | grep -E "SwiftCompile|actool|ibtool|ld " | grep -v grep | cut -c1-300; tail -40 "$RUNNER_TEMP/build.log"; pkill -f xcodebuild ) &
           WD=$!
           xcodebuild archive \
             -project PDFMathReader.xcodeproj \
