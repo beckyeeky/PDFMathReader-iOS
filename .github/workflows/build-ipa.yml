@@ -61,6 +61,16 @@ jobs:
           kill $WD 2>/dev/null || true
           grep -E "^\*\* ARCHIVE" "$RUNNER_TEMP/build.log"
 
+      - name: Package IPA
+        run: |
+          APP="$RUNNER_TEMP/PDFMathReader.xcarchive/Products/Applications/PDFMathReader.app"
+          ls "$APP"
+          /usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$APP/Info.plist" || true
+          mkdir -p out/Payload
+          cp -R "$APP" out/Payload/
+          cd out && zip -qry ../PDFMathReader-unsigned.ipa Payload
+          cd .. && ls -lh PDFMathReader-unsigned.ipa
+
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
