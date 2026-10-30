@@ -43,7 +43,7 @@ jobs:
       - name: Archive (unsigned)
         run: |
           set -o pipefail
-          ( sleep 1500; echo "=== WATCHDOG: still running after 25 min ==="; ps -Ao etime,args | grep -E "swift-frontend|swiftc|ld|actool|ibtool" | grep -v grep | cut -c1-600; tail -40 "$RUNNER_TEMP/build.log"; pkill -f xcodebuild ) &
+          ( sleep 600; echo "=== WATCHDOG: still running after 10 min ==="; ps -Ao pid,etime,args | grep swift-frontend | grep -v grep | while read pid et rest; do echo "PID $pid ELAPSED $et"; echo "$rest" | tr ' ' '\n' | grep -A1 -E '^-primary-file$' | grep -v -- '-primary-file' | grep -v -- '--'; done; ps -Ao etime,args | grep -E "SwiftCompile|actool|ibtool|ld " | grep -v grep | cut -c1-300; tail -40 "$RUNNER_TEMP/build.log"; pkill -f xcodebuild ) &
           WD=$!
           xcodebuild archive \
             -project PDFMathReader.xcodeproj \
